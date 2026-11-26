@@ -1,40 +1,16 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Stellar Polytrope Explorer</title>
-<meta name="claude:viewport-fit-sides" content="cover">
+<title>Interactive Stellar Polytrope Model!</title>
+<meta name="viewport-fit-sides" content="cover">
 <meta name="description" content="Interactive Lane–Emden polytrope models: adjust n, M, R and μ and see the star's interior profiles.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
-<!--
-  PHYS 435 Stellar Model Project -- the web app.
-
-  THIS IS THE SELF-CONTAINED VERSION: everything is in this one file.
-    - The physics (rescaling + Eddington maths, with sources) is in the
-      <script> block marked "physics.js" near the bottom.
-    - The Lane-Emden data from generate_polytrope_data.py is in the very
-      long <script> block marked "polytropes.js" (one huge line of numbers).
-  Plus Plotly (the plotting library), loaded from the jsDelivr CDN, so the
-  page needs an internet connection the first time it opens.
-
-  HOW THE PAGE WORKS
-    1. Every slider or checkbox change calls update().
-    2. update() reads the controls, picks the stored solution for n
-       (Physics.getModel), finds beta if Eddington's model is on
-       (Physics.eddingtonBeta), and rescales to physical units
-       (Physics.physicalProfiles).
-    3. It then writes the central values into the readout tiles and redraws
-       the four plots with Plotly.react (which updates a plot in place,
-       fast enough to follow a slider as it moves).
-    4. "Pin this model" copies the current profiles into a list; pinned
-       models are drawn dashed underneath the live one so you can compare.
--->
 <style>
-/* Layout: control column on the left, readouts + 2x2 plot grid on the right;
-   stacks to one column on narrow screens. Cool neutrals, one blue accent. */
+/* Layout: control column on the left, readouts + 2x2 plot grid on the right; stacks to one column on narrow screens. Cool neutrals, one blue accent. */
 :root {
   --bg: #f4f6f9;
   --surface: #ffffff;
@@ -220,8 +196,9 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .colorbar-strip {
   height: 10px;
   border-radius: 5px;
-  /* Same colour ramp the disc uses: surface (0) on the left, centre (max) on the right. */
-  background: linear-gradient(90deg, #4a1408, #a8320f 25%, #e0661f 50%, #f7b24a 75%, #fff1cf);
+  /* Same colour ramp the disc uses (RAMP in the app script): lowest value on
+     the left, highest on the right. Matches the sparkler slide's colours. */
+  background: linear-gradient(90deg, #24163a, #7a1e3b 30%, #d94f2b 55%, #f5a63b 78%, #fff3d6);
 }
 .colorbar-labels {
   display: flex;
@@ -342,12 +319,9 @@ footer h2 { font: 600 0.9rem var(--font-display); margin: 0; color: var(--ink); 
 <div class="wrap">
 
   <header>
-    <h1>Stellar Polytrope Explorer</h1>
+    <h1>Interactive Stellar Polytrope Model!</h1>
     <p class="lede">
-      Interior structure of a polytropic star, <span class="eq">P = Kρ<sup>1+1/n</sup></span>.
-      Choose the polytropic index, mass, radius and mean molecular weight; the density,
-      pressure, temperature and enclosed mass profiles update as you move the sliders.
-    </p>
+      Interior structure of a polytropic star, <span class="eq">P = Kρ<sup>1+1/n</sup></span>, modelled for a given polytropic index, mass, radius and mean molecular weight. 
   </header>
 
   <div id="load-error" class="notice" hidden></div>
@@ -362,9 +336,8 @@ footer h2 { font: 600 0.9rem var(--font-display); margin: 0; color: var(--ink); 
           <label for="n-slider">Polytropic index <i>n</i></label>
           <output id="n-out" for="n-slider">3.00</output>
         </div>
-        <!-- Step 0.05 matches the stored solutions exactly (see physics.js getModel). -->
         <input type="range" id="n-slider" min="0" max="4.5" step="0.05" value="3">
-        <p class="hint">n = 1.5: fully convective · n = 3: Eddington’s standard model</p>
+        <p class="hint">n = 1.5: fully convective model · n = 3: Eddington’s standard model</p>
       </div>
 
       <div class="control">
@@ -372,7 +345,6 @@ footer h2 { font: 600 0.9rem var(--font-display); margin: 0; color: var(--ink); 
           <label for="m-slider">Mass <i>M</i></label>
           <output id="m-out" for="m-slider">1.00 M☉</output>
         </div>
-        <!-- Logarithmic slider: value v gives M = 10^v solar masses (0.1 to 100). -->
         <input type="range" id="m-slider" min="-1" max="2" step="0.01" value="0">
       </div>
 
@@ -381,7 +353,6 @@ footer h2 { font: 600 0.9rem var(--font-display); margin: 0; color: var(--ink); 
           <label for="r-slider">Radius <i>R</i></label>
           <output id="r-out" for="r-slider">1.00 R☉</output>
         </div>
-        <!-- Logarithmic slider: value v gives R = 10^v solar radii (0.1 to 100). -->
         <input type="range" id="r-slider" min="-1" max="2" step="0.01" value="0">
       </div>
 
@@ -399,8 +370,7 @@ footer h2 { font: 600 0.9rem var(--font-display); margin: 0; color: var(--ink); 
         <input type="checkbox" id="edd-check">
         <label for="edd-check">Eddington’s standard model</label>
         <p class="hint">Fixes n = 3 and adds radiation pressure with a constant
-          ratio <span class="eq">β = P<sub>gas</sub>/P</span>, found from Eddington’s quartic.
-          Lowers the temperature by the factor β.</p>
+          ratio <span class="eq">β = P<sub>gas</sub>/P</span>, found from Eddington’s quartic. Temperature lowers by a factor β.</p>
       </div>
 
       <div class="check-row">
@@ -408,7 +378,7 @@ footer h2 { font: 600 0.9rem var(--font-display); margin: 0; color: var(--ink); 
         <label for="norm-check">Show as fraction of central value</label>
         <p class="hint">Plots <span class="eq">ρ/ρ<sub>c</sub></span>, <span class="eq">P/P<sub>c</sub></span>
           and <span class="eq">T/T<sub>c</sub></span>, so every model runs from 1 at the centre
-          to 0 at the surface and their shapes compare directly.</p>
+          to 0 at the surface to compare their shapes directly.</p>
       </div>
 
       <div class="check-row">
@@ -422,28 +392,26 @@ footer h2 { font: 600 0.9rem var(--font-display); margin: 0; color: var(--ink); 
         <button type="button" class="primary" id="pin-btn">Pin this model</button>
         <button type="button" id="sun-btn">Reset to the Sun</button>
       </div>
-      <p class="hint" id="pin-hint">Pin up to 3 models to compare them with the live one.</p>
+      <p class="hint" id="pin-hint">Pin up to 3 models</p>
     </form>
 
-    <!-- ===================== RESULTS ===================== -->
     <section class="results" aria-label="Model results">
 
       <div class="hero">
-        <!-- Cross-section through the star, drawn on a canvas (see drawStar). -->
         <div class="star-card">
           <div class="star-head">
             <h2>Cross-section</h2>
             <div class="segmented" role="radiogroup" aria-label="Colour the cross-section by">
-              <input type="radio" name="star-qty" id="star-T" value="T" checked>
-              <label for="star-T">Temperature</label>
-              <input type="radio" name="star-qty" id="star-rho" value="rho">
+              <input type="radio" name="star-qty" id="star-rho" value="rho" checked>
               <label for="star-rho">Density</label>
+              <input type="radio" name="star-qty" id="star-T" value="T">
+              <label for="star-T">Temperature</label>
             </div>
           </div>
-          <canvas id="star-canvas" role="img" aria-label="Cross-section of the star coloured by temperature"></canvas>
+          <canvas id="star-canvas" role="img" aria-label="Cross-section of the star coloured by density"></canvas>
           <div class="colorbar">
             <div class="colorbar-strip"></div>
-            <div class="colorbar-labels"><span>0</span><span id="cb-max">–</span></div>
+            <div class="colorbar-labels"><span id="cb-min">–</span><span id="cb-max">–</span></div>
           </div>
           <p class="star-caption" id="star-caption">Dashed ring: half the star’s mass lies inside it.</p>
         </div>
@@ -470,19 +438,6 @@ footer h2 { font: 600 0.9rem var(--font-display); margin: 0; color: var(--ink); 
       </div>
     </section>
   </div>
-
-  <footer>
-    <h2>Method</h2>
-    <p>The Lane–Emden equation was solved for n = 0 to 4.5 in steps of 0.05 with SciPy’s
-      <code>solve_ivp</code> (DOP853, tolerances 10<sup>−12</sup>), starting from the central
-      series θ ≈ 1 − ξ²/6 + nξ⁴/120. The solutions agree with a hand-written fourth-order
-      Runge–Kutta solver to about 10<sup>−8</sup> in ξ₁. Profiles are rescaled with
-      ρ = ρ<sub>c</sub>θ<sup>n</sup>, P = P<sub>c</sub>θ<sup>n+1</sup>, T = T<sub>c</sub>θ and
-      m = qM, with ρ<sub>c</sub> = D<sub>n</sub>ρ̄, P<sub>c</sub> = W<sub>n</sub>GM²/R⁴ and
-      the ideal-gas law for T<sub>c</sub>. Polytropes are idealized models: the Sun is not a
-      polytrope, so compare these profiles with a full solar model rather than treating them
-      as predictions.</p>
-  </footer>
 </div>
 
 <!-- Plotly from the jsDelivr CDN, pinned to an exact version. -->
@@ -495,39 +450,7 @@ globalThis.POLYTROPE_DATA = {"description":"Dimensionless Lane-Emden solutions f
 
 </script>
 <script>
-/* ===== physics.js (inlined) ===== */
-/*
-===============================================================================
-PHYS 435 Stellar Model Project -- physics.js
-===============================================================================
 
-The physics behind the web page, kept separate from the page layout so it's
-easy to read and to test. Every function here is a direct translation of the
-Python reference in generate_polytrope_data.py (Parts 3 and 4), plus
-Eddington's standard model for n = 3.
-
-WHAT THE PAGE DOES WITH THIS
-  1. Pick the stored Lane-Emden solution for the chosen n  (getModel)
-  2. Rescale it to the chosen M, R, mu                      (physicalProfiles)
-  3. If Eddington's model is on, find beta for that M, mu    (eddingtonBeta)
-     and use it to lower the temperature.
-
-REFERENCES (same short tags as the Python files)
-  [WVU]      Stellar Models lecture notes, West Virginia University --
-             mass M = 4 pi alpha^3 rho_c (-xi_1^2 theta'_1), rho_c = D_n rho_mean.
-  [UMD]      M. C. Miller, ASTR 406 Lecture 23 -- alpha^2 = (n+1)P_c/(4 pi G rho_c^2),
-             rho = rho_c theta^n.
-  [Caltech]  Ay 101 polytropes notes -- P_gas = rho k T/(mu m_H); for n = 3 with
-             radiation, K = [(k/mu m_H)^4 * 3(1-beta)/(a beta^4)]^(1/3); and the
-             mass formula M = 4 pi [(n+1)K/(4 pi G)]^(3/2) rho_c^((3-n)/2n) (-xi_1^2 theta'_1).
-  [Burrows]  A. Burrows, "Eddington Model", AST 403 lecture notes, Princeton --
-             constant beta = P_gas/P; the quartic 1 - beta = 0.003 (M/M_sun)^2 mu^4 beta^4;
-             beta -> 1 at low mass, beta -> 0 at high mass; beta ~ 0.9995 for the
-             Sun with mu ~ 0.62; beta = 0.5 at M = 51/mu^2 M_sun.
-  [CODATA]   Physical constants, the same values SciPy uses (scipy.constants).
-  [IAU-B3]   IAU 2015 Resolution B3 nominal solar radius and GM.
-===============================================================================
-*/
 
 const Physics = (function () {
   // ---------------------------------------------------------------------------
@@ -550,10 +473,7 @@ const Physics = (function () {
   // ---------------------------------------------------------------------------
   // getModel: the stored solution for the chosen n
   // ---------------------------------------------------------------------------
-  // The data file holds solutions for n = 0.00, 0.05, ..., 4.50. The page's
-  // n slider uses the same 0.05 steps, so it always lands on a stored value
-  // and no interpolation between different n is ever needed. Rounding to the
-  // nearest index just protects against floating-point values like 2.9999999.
+  // The data file holds solutions for n = 0.00, 0.05, ..., 4.50. The page's n slider uses the same 0.05 steps, so it always lands on a stored value and no interpolation between different n is ever needed. Rounding to the nearest index just protects against floating-point values like 2.9999999.
   function getModel(data, n) {
     const step = data.models[1].n - data.models[0].n;     // 0.05
     let i = Math.round((n - data.models[0].n) / step);
@@ -692,7 +612,7 @@ if (typeof module !== "undefined") module.exports = Physics;
     tileBeta: $("tile-beta"), rhoc: $("ro-rhoc"), rhobar: $("ro-rhobar"),
     pc: $("ro-pc"), tc: $("ro-tc"),
     legend: $("legend"),
-    canvas: $("star-canvas"), cbMax: $("cb-max"), starCaption: $("star-caption"),
+    canvas: $("star-canvas"), cbMin: $("cb-min"), cbMax: $("cb-max"), starCaption: $("star-caption"),
   };
 
   // ---------------------------------------------------------------------------
@@ -882,21 +802,40 @@ if (typeof module !== "undefined") module.exports = Physics;
   }
 
   // ---------------------------------------------------------------------------
-  // The cross-section: a disc coloured by T/T_c or rho/rho_c
+  // The cross-section: a disc coloured by density or temperature
   // ---------------------------------------------------------------------------
   // The star is drawn as a circle of fixed size (its edge is r = R). A radial
-  // gradient paints each radius with the colour for that value: pale yellow
-  // where the quantity is at its central maximum, through orange and red, to
-  // dark red where it falls to zero at the surface. Because the colour depends
-  // on the FRACTION of the central value, you see the shape of the profile:
-  // high-n stars show a small bright core in a large dim envelope.
-  const RAMP = [   // [fraction of central value, RGB]
-    [0.00, [74, 20, 8]],
-    [0.25, [168, 50, 15]],
-    [0.50, [224, 102, 31]],
-    [0.75, [247, 178, 74]],
-    [1.00, [255, 241, 207]],
+  // gradient paints each radius with a colour from RAMP: dark purple for the
+  // lowest values, through red and orange, to cream for the highest. These are
+  // the same colours as the sparkler slide.
+  //
+  // DENSITY (the default) is coloured by rho / rho_mean on a LOG scale that is
+  // the same for every star: 0.01x the mean density maps to the dark end and
+  // DENS_TOP (54x, the n = 3 central value) to the bright end. Because the
+  // scale is shared, stars can be compared directly: an n = 1.5 core (about
+  // 6x the mean) glows amber, an n = 3 core (about 54x) glows cream. Cores
+  // denser than 54x (n above 3) are drawn at the brightest colour; the caption
+  // gives the true central value so nothing is hidden.
+  //
+  // TEMPERATURE is coloured by T / T_c on a linear scale, since T = T_c theta
+  // falls smoothly from the centre to zero at the surface.
+  const RAMP = [   // [position on the colour scale, 0 to 1, RGB]
+    [0.00, [36, 22, 58]],
+    [0.30, [122, 30, 59]],
+    [0.55, [217, 79, 43]],
+    [0.78, [245, 166, 59]],
+    [1.00, [255, 243, 214]],
   ];
+  const DENS_BOTTOM = 0.01;   // rho/rho_mean at the dark end of the scale
+  const DENS_TOP = 54.2;      // rho/rho_mean at the bright end (n = 3 centre is 54.18)
+  const LOG_BOTTOM = Math.log10(DENS_BOTTOM), LOG_TOP = Math.log10(DENS_TOP);
+
+  // Position on the colour scale (0 to 1) for a density ratio rho/rho_mean.
+  function densityPosition(ratio) {
+    if (ratio <= 0) return 0;   // the surface, where rho = 0
+    return (Math.log10(ratio) - LOG_BOTTOM) / (LOG_TOP - LOG_BOTTOM);
+  }
+
   function rampColour(v) {
     v = Math.max(0, Math.min(1, v));
     let k = 1;
@@ -919,11 +858,14 @@ if (typeof module !== "undefined") module.exports = Physics;
     ctx.clearRect(0, 0, size, size);
 
     const c = size / 2, Rpx = size / 2 - 3;
-    const values = s.starQty === "T" ? p.T.map((v) => v / p.TC) : p.rho.map((v) => v / p.rhoC);
+    const isT = s.starQty === "T";
+    const positions = isT
+      ? p.T.map((v) => v / p.TC)
+      : p.rho.map((v) => densityPosition(v / p.rhoMean));
 
     // Radial gradient with a colour stop every 5th grid point (81 stops).
     const grad = ctx.createRadialGradient(c, c, 0, c, c, Rpx);
-    for (let i = 0; i < X.length; i += 5) grad.addColorStop(X[i], rampColour(values[i]));
+    for (let i = 0; i < X.length; i += 5) grad.addColorStop(X[i], rampColour(positions[i]));
     ctx.beginPath();
     ctx.arc(c, c, Rpx, 0, 2 * Math.PI);
     ctx.fillStyle = grad;
@@ -932,23 +874,42 @@ if (typeof module !== "undefined") module.exports = Physics;
     ctx.strokeStyle = token("--line");
     ctx.stroke();
 
-    // Half-mass ring.
+    // Half-mass ring. White shows up on the darker colours; over the
+    // brightest part of the scale (high-n cores) it would vanish, so the ring
+    // switches to a dark line there.
+    const iHalf = Math.min(X.length - 1, Math.round(half * (X.length - 1)));
+    const ringOnBright = positions[iHalf] > 0.7;
     ctx.beginPath();
     ctx.arc(c, c, half * Rpx, 0, 2 * Math.PI);
     ctx.setLineDash([5, 4]);
     ctx.lineWidth = 1.5;
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+    ctx.strokeStyle = ringOnBright ? "rgba(36, 22, 58, 0.9)" : "rgba(255, 255, 255, 0.9)";
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Colour bar label and accessible description.
-    const name = s.starQty === "T" ? "temperature" : "density";
-    el.cbMax.textContent = s.starQty === "T"
-      ? `${sci(p.TC)} K (centre)` : `${sci(p.rhoC)} kg m⁻³ (centre)`;
+    // Colour bar labels, caption and accessible description.
+    const ringText = `Dashed ring: half the star’s mass lies inside r = ${half.toFixed(2)} R.`;
+    const conc = p.rhoC / p.rhoMean;   // central / mean density (= D_n)
+    // Whole numbers from 100 up (e.g. "6,189"), three figures below (e.g. "5.99").
+    const concText = conc >= 100 ? Math.round(conc).toLocaleString("en") : conc.toPrecision(3);
+    if (isT) {
+      el.cbMin.textContent = "0";
+      el.cbMax.textContent = `${sci(p.TC)} K (centre)`;
+      el.starCaption.textContent =
+        `Colour shows temperature as a fraction of its central value. ${ringText}`;
+    } else {
+      el.cbMin.textContent = "0.01× mean";
+      el.cbMax.textContent = "54× mean";
+      const over = conc > DENS_TOP
+        ? " Anything above 54× is drawn at the brightest colour." : "";
+      el.starCaption.textContent =
+        `Colour shows density compared with the mean density, on a log scale shared by every star. ` +
+        `The centre is ${concText}× the mean.${over} ${ringText}`;
+    }
     el.canvas.setAttribute("aria-label",
-      `Cross-section of the star coloured by ${name}; half the mass lies inside r = ${half.toFixed(2)} R`);
-    el.starCaption.textContent =
-      `Colour shows ${name} as a fraction of its central value. Dashed ring: half the star’s mass lies inside r = ${half.toFixed(2)} R.`;
+      `Cross-section of the star coloured by ${isT ? "temperature" : "density"}; ` +
+      (isT ? "" : `the centre is ${concText} times the mean density; `) +
+      `half the mass lies inside r = ${half.toFixed(2)} R`);
   }
 
   // ---------------------------------------------------------------------------
